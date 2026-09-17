@@ -2,7 +2,7 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 6.0"
+      version = "~> 5.0"
     }
   }
 }
@@ -12,7 +12,7 @@ provider "aws" {
   region = "ap-south-1"
 }
 
-# Create a VPC
+# Create an S3 Bucket
 resource "aws_s3_bucket" "lab_bucket" {
-  bucket_prefix= "d-aws-lab"
+  bucket_prefix = "d-aws-lab"
 }
