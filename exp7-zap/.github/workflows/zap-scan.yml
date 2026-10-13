@@ -1,0 +1,73 @@
+
+name: OWASP ZAP Security Scan
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  zap-scan:
+    name: Build and Scan Web Application
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker Image
+        run: docker build -t my-web-app:latest .
+
+      - name: Create Docker Network
+        run: docker network create zap-net
+
+      - name: Run Web Application
+        run: |
+          docker run -d \
+            --name webapp \
+            --network zap-net \
+            -p 8080:8080 \
+            my-web-app:latest
+
+      - name: Wait for Application
+        run: |
+          for i in {1..30}; do
+            if curl -fsS http://localhost:8080/; then
+              echo "Application is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Application failed to start"
+          docker logs webapp
+          exit 1
+
+      - name: Run OWASP ZAP Baseline Scan
+        run: |
+          docker run --rm \
+            --network zap-net \
+            -v "$PWD:/zap/wrk:rw" \
+            zaproxy/zap-stable \
+            zap-baseline.py \
+            -t http://webapp:8080 \
+            -r zap-report.html
+
+      - name: Upload ZAP Report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-security-report
+          path: zap-report.html
+          if-no-files-found: warn
+
+      - name: Show Application Logs on Failure
+        if: failure()
+        run: docker logs webapp || true
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker rm -f webapp || true
+          docker network rm zap-net || true
